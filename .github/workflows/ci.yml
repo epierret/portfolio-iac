@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer Ansible et ansible-lint
+        run: pip install "ansible-core~=2.17.0" "ansible-lint~=24.7"
+
+      - name: Vérifier la syntaxe des playbooks
+        run: |
+          ansible-playbook --syntax-check -i ansible/inventory.ini ansible/audit.yml
+          ansible-playbook --syntax-check -i ansible/inventory.ini ansible/deploy.yml
+
+      - name: Lint Ansible
+        run: ansible-lint ansible/
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Analyser le Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
