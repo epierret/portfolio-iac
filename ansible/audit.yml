@@ -14,7 +14,9 @@
       ansible.builtin.shell: |
         docker --version 2>&1 || echo "docker : absent"
         nginx -v 2>&1 || echo "nginx : absent"
-        plesk version 2>&1 | head -n 1 || echo "plesk : absent"
+        plesk version 2>&1 || echo "plesk : absent"
+      args:
+        executable: /bin/bash
       register: versions
       changed_when: false
       failed_when: false
@@ -24,18 +26,20 @@
         for s in nginx caddy docker ssh; do
           echo "$s : $(systemctl is-active $s 2>&1)"
         done
+      args:
+        executable: /bin/bash
       register: services
       changed_when: false
       failed_when: false
 
     - name: Conteneur portfolio
-      ansible.builtin.shell: docker ps -a --filter name=portfolio --format '{{ "{{" }}.Names{{ "}}" }} {{ "{{" }}.Status{{ "}}" }}' 2>&1 || echo "docker indisponible"
+      ansible.builtin.shell: docker ps -a --filter name=portfolio || echo "docker indisponible"
       register: container
       changed_when: false
       failed_when: false
 
     - name: Ports en écoute
-      ansible.builtin.shell: ss -tlnp
+      ansible.builtin.command: ss -tlnp
       register: ports
       changed_when: false
       failed_when: false
@@ -47,6 +51,7 @@
           - "{{ versions.stdout }}"
           - "Services :"
           - "{{ services.stdout }}"
-          - "Conteneur portfolio : {{ container.stdout }}"
+          - "Conteneur portfolio :"
+          - "{{ container.stdout }}"
           - "Ports en écoute :"
           - "{{ ports.stdout }}"
