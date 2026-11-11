@@ -1,0 +1,57 @@
+---
+- name: Déployer le site portfolio dans son conteneur
+  hosts: vps
+  become: true
+  gather_facts: false
+  vars:
+    app_dir: /opt/portfolio
+    image: portfolio:test
+    src_dir: "{{ playbook_dir }}/.."
+
+  tasks:
+    - name: Dossier de l'application
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copier le Dockerfile et le .dockerignore
+      ansible.builtin.copy:
+        src: "{{ src_dir }}/{{ item }}"
+        dest: "{{ app_dir }}/{{ item }}"
+        mode: "0644"
+      loop:
+        - Dockerfile
+        - .dockerignore
+
+    - name: Copier le contenu du site
+      ansible.builtin.copy:
+        src: "{{ src_dir }}/site/"
+        dest: "{{ app_dir }}/site/"
+
+    - name: Construire l'image
+      ansible.builtin.command: docker build -t {{ image }} {{ app_dir }}
+      changed_when: true
+
+    - name: Retirer l'ancien conteneur s'il existe
+      ansible.builtin.command: docker rm -f portfolio
+      register: rm_old
+      changed_when: rm_old.rc == 0
+      failed_when: false
+
+    - name: Lancer le conteneur
+      ansible.builtin.command: >
+        docker run -d --name portfolio --restart unless-stopped
+        -p 127.0.0.1:8080:8080
+        --read-only --tmpfs /tmp --tmpfs /var/cache/nginx
+        --security-opt no-new-privileges:true
+        {{ image }}
+      changed_when: true
+
+    - name: Vérifier que le conteneur répond
+      ansible.builtin.command: curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/
+      register: check
+      changed_when: false
+      until: check.stdout == "200"
+      retries: 5
+      delay: 2

@@ -1,0 +1,52 @@
+---
+- name: État des lieux du VPS (lecture seule)
+  hosts: vps
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Version de Debian
+      ansible.builtin.command: cat /etc/debian_version
+      register: debian
+      changed_when: false
+      failed_when: false
+
+    - name: Versions de Docker, nginx et Plesk
+      ansible.builtin.shell: |
+        docker --version 2>&1 || echo "docker : absent"
+        nginx -v 2>&1 || echo "nginx : absent"
+        plesk version 2>&1 | head -n 1 || echo "plesk : absent"
+      register: versions
+      changed_when: false
+      failed_when: false
+
+    - name: État des services
+      ansible.builtin.shell: |
+        for s in nginx caddy docker ssh; do
+          echo "$s : $(systemctl is-active $s 2>&1)"
+        done
+      register: services
+      changed_when: false
+      failed_when: false
+
+    - name: Conteneur portfolio
+      ansible.builtin.shell: docker ps -a --filter name=portfolio --format '{{ "{{" }}.Names{{ "}}" }} {{ "{{" }}.Status{{ "}}" }}' 2>&1 || echo "docker indisponible"
+      register: container
+      changed_when: false
+      failed_when: false
+
+    - name: Ports en écoute
+      ansible.builtin.shell: ss -tlnp
+      register: ports
+      changed_when: false
+      failed_when: false
+
+    - name: Rapport
+      ansible.builtin.debug:
+        msg:
+          - "Debian : {{ debian.stdout }}"
+          - "{{ versions.stdout }}"
+          - "Services :"
+          - "{{ services.stdout }}"
+          - "Conteneur portfolio : {{ container.stdout }}"
+          - "Ports en écoute :"
+          - "{{ ports.stdout }}"
